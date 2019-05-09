@@ -13,6 +13,7 @@ public class AES {
 	
 	private static byte[] key;
 	
+	
 	public static void setKey(String myKey) {
 		MessageDigest sha = null;
 		try {
