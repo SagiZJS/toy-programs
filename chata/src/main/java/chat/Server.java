@@ -1,37 +1,39 @@
 package chat;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.InetSocketAddress;
 import java.net.SocketException;
-import java.util.Arrays;
+import java.nio.ByteBuffer;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.Scanner;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+
 
 public class Server {
 
 	private static final int PORT = 32345;
 
-	private final ServerSocket server;
+	private final ServerSocketChannel server;
 
-	private final BlockingQueue<Socket> sockets;
+	private final BlockingQueue<SocketChannel> sockets;
 
 	private final BlockingQueue<String> messages;
 
 	private final Thread[] threads;
 
-	public Server(int port) throws IOException {
-		this.server = new ServerSocket(PORT);
+	public Server(String hostIP,int port) throws IOException {
+		server = ServerSocketChannel.open();
+		server.bind(new InetSocketAddress(hostIP, port));
+        server.configureBlocking(false);
 		this.sockets = new ArrayBlockingQueue<>(100);
 		this.messages = new ArrayBlockingQueue<>(1000);
 		threads = new Thread[2];
 		serverStart();
-
 	}
+	
 
 	public void serverShutDown() {
 		for (Thread thread : threads) {
@@ -46,31 +48,58 @@ public class Server {
 		}
 	}
 
-	public Server() throws IOException {
-		this(PORT);
+	public Server(String host) throws IOException {
+		this(host, PORT);
 	}
 
-	private void readFrom(InputStream is) throws IOException {
-		byte[] b = new byte[1024];
-		String output = new String(new byte[0], "UTF-8");
-		int len = -2;
-		while ((len = is.read(b)) != -1) {
-			output += new String(Arrays.copyOf(b, len), "UTF-8");
+	private void readFrom(SocketChannel sc) throws IOException {
+		ByteBuffer buffer = ByteBuffer.allocate(1024);
+		byte[] b;
+		int len = 0;
+		StringBuilder output = new StringBuilder();
+		while ((len = sc.read(buffer)) > 0) {
+			buffer.flip();
+			b = new byte[len];
+			buffer.get(b, 0, len);
+			output.append(new String(b, "UTF-8"));
+			//System.out.println(output);
+			buffer.clear();
 		}
+		if (output.length() == 0) return;
 		try {
-			messages.put(output);
+			messages.put(output.toString());
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
 		}
+		
 	}
+	
+//	private void readFrom(InputStream is) throws IOException {
+//		byte[] b = new byte[1024];
+//		String output = new String(new byte[0], "UTF-8");
+//		int len = -2;
+//		while ((len = is.read) > -1) {
+//			System.out.println(len);
+//			len = is.read(b);
+//			output += new String(Arrays.copyOf(b, len), "UTF-8");
+//			try {
+//				messages.put(output);
+//			} catch (InterruptedException e) {
+//				throw new RuntimeException(e);
+//			}
+//		}
+//	}
 
-	private void process(Socket socket) {
+	private void process(SocketChannel socket) {
 		try {
 			sockets.put(socket);
-			readFrom(socket.getInputStream());
-			socket.shutdownInput();
+			socket.configureBlocking(false);
+			while (!Thread.currentThread().isInterrupted()) {
+				readFrom(socket);
+			}
 		} catch (IOException e) {
-			e.printStackTrace();
+			System.out.println("a Host is down\n");
+			sockets.remove(socket);
 		} catch (InterruptedException ie) {
 			ie.printStackTrace();
 		}
@@ -79,18 +108,21 @@ public class Server {
 	private void send() {
 		byte[] message = null;
 		try {
-			message = messages.take().getBytes("UTF-8");
+			String m = messages.take();
+			if (m == null) return;
+			message = m.getBytes("UTF-8");
 		} catch (InterruptedException e) {
 			throw new RuntimeException(e);
 		} catch (UnsupportedEncodingException e) {
 			throw new RuntimeException(e);
 		}
-		Socket[] socketsArr = sockets.toArray(new Socket[0]);
-		for (Socket socket : socketsArr) {
-			if (!socket.isClosed()) {
-				try (OutputStream os = socket.getOutputStream()) {
-					os.write(message);
-					socket.shutdownOutput();
+		
+		SocketChannel[] socketsArr = sockets.toArray(new SocketChannel[0]);
+		for (SocketChannel socket : socketsArr) {
+			if (socket.isOpen()) {
+				try {
+					ByteBuffer buffer = ByteBuffer.wrap(message);
+					socket.write(buffer);
 				} catch (IOException e) {
 					throw new RuntimeException(e);
 				}
@@ -107,10 +139,12 @@ public class Server {
 			public void run() {
 				while (!Thread.currentThread().isInterrupted()) {
 					try {
-						Socket socket = server.accept();
+						SocketChannel socket = server.accept();
+						if (socket == null) continue;
 						new Thread(new Runnable() {
 							@Override
 							public void run() {
+								
 								process(socket);
 							}
 						}).start();
@@ -136,10 +170,30 @@ public class Server {
 		threads[1].start();
 	}
 
+	private static void panic() {
+		System.out.println("usage:\n\tServer hostIP [port] ");
+	}
+	
 	public static void main(String[] args) {
-		int port = argsCheck(args);
+		String host = "";
+		int port = 0;
+		if (args.length <= 2 && args.length > 0) {
+			try {
+				port = args.length == 2 ? Integer.valueOf(args[1]) : PORT;
+				new InetSocketAddress(args[0], port);
+			} catch (NumberFormatException e) {
+				port = PORT;
+			} catch (IllegalArgumentException iae) {
+				panic();
+				return;
+			}
+
+		} else {
+			panic();
+			return;
+		}
 		try {
-			Server s = new Server(port);
+			Server s = new Server(host, port);
 			Scanner scanner = new Scanner(System.in);
 			System.out.println("Server started");
 			while (true) {
@@ -154,16 +208,6 @@ public class Server {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}
-	private static int argsCheck(String[] args) {
-		if (args.length == 1) {
-			try {
-				return Integer.valueOf(args[0]);
-			} catch (NumberFormatException e) {
-				return PORT;
-			}
-		}
-		return PORT;
 	}
 
 }

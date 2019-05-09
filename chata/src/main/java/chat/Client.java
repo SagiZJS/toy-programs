@@ -1,10 +1,10 @@
 package chat;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.Socket;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
@@ -15,9 +15,10 @@ public class Client {
 
 	private static final String KEY = "asdqwerasdqrwqwt";
 
-	private final Socket socket;
+	private final SocketChannel socket;
 
 	private final String username;
+	
 	
 	public Client(String username, String host) throws UnknownHostException {
 		this(username, host, PORT);
@@ -26,10 +27,13 @@ public class Client {
 	public Client(String username, String host, int port) throws UnknownHostException {
 		this.username = username;
 		try {
-			socket = new Socket(host, port);
+			System.out.println(host+port);
+			socket = SocketChannel.open(new InetSocketAddress(host, port));
+			socket.configureBlocking(false);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
+		commandSend("is connected");
 	}
 	
 	public String getUsername() {
@@ -58,9 +62,7 @@ public class Client {
 
 	private void send(String txt) {
 		try {
-			OutputStream op = socket.getOutputStream();
-			op.write(txt.getBytes("UTF-8"));
-			socket.shutdownOutput();
+			socket.write(ByteBuffer.wrap(txt.getBytes("UTF-8")));
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
@@ -69,13 +71,16 @@ public class Client {
 	private String read() {
 		StringBuilder output = new StringBuilder();
 		try {
-			InputStream is = socket.getInputStream();
+			
 			byte[] b = new byte[1024];
 			int len = 0;
-			while ((len = is.read(b)) != -1) {
+			ByteBuffer buffer = ByteBuffer.allocate(1024);
+			while ((len = socket.read(buffer)) > 0) {
+				buffer.flip();
+				buffer.get(b, 0, len);
 				output.append(new String(Arrays.copyOf(b, len), "UTF-8"));
+				buffer.clear();
 			}
-			socket.shutdownInput();
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}

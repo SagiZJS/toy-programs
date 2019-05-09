@@ -72,7 +72,7 @@ public class FuckFinal {
 			}
 		} else if (args.length == 3) {
 			try {
-				client =  new Client(args[0], args[1], Integer.valueOf(args[3]));
+				client =  new Client(args[0], args[1], Integer.valueOf(args[2]));
 			} catch (UnknownHostException e) {
 				System.out.println("host not found");
 				panic();
@@ -93,6 +93,7 @@ public class FuckFinal {
 		if (client ==null)
 			return; 
 		Scanner scanner = new Scanner(System.in);
+		processCMDS("read", client);
 		while (client != null) {
 			System.out.print(client.getUsername() + ">>");
 			if (scanner.hasNextLine()) {
