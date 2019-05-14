@@ -26,8 +26,8 @@ public class Server {
 
 	public Server(String hostIP,int port) throws IOException {
 		server = ServerSocketChannel.open();
-		server.bind(new InetSocketAddress(hostIP, port));
-        server.configureBlocking(false);
+		server.configureBlocking(false);
+		server.bind(new InetSocketAddress(port));
 		this.sockets = new ArrayBlockingQueue<>(100);
 		this.messages = new ArrayBlockingQueue<>(1000);
 		threads = new Thread[2];
@@ -134,7 +134,6 @@ public class Server {
 
 	private void serverStart() {
 		threads[0] = new Thread(new Runnable() {
-
 			@Override
 			public void run() {
 				while (!Thread.currentThread().isInterrupted()) {

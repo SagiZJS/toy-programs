@@ -1,6 +1,7 @@
 package chat;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
@@ -28,7 +29,8 @@ public class Client {
 		this.username = username;
 		try {
 			System.out.println(host+port);
-			socket = SocketChannel.open(new InetSocketAddress(host, port));
+			socket = SocketChannel.open();
+			socket.connect(new InetSocketAddress(host, port));
 			socket.configureBlocking(false);
 		} catch (IOException e) {
 			throw new RuntimeException(e);
@@ -52,12 +54,20 @@ public class Client {
 		if (txt == null) return;
 		txt = new SimpleDateFormat("HH:mm:ss").format(new Date()) + " " + this.username + ":" + txt;
 		String encrypted = AES.encrypt(txt, key);
-		send(encrypted);
+		byte[] c = {','};
+		try {
+			send(encrypted+new String(c, "UTF-8"));
+		} catch (UnsupportedEncodingException e) {
+			e.printStackTrace();
+		}
 	}
 
 	public String commandRead(String key) {
-		String decrypted = AES.decrypt(read(), key);
-		return decrypted + '\n';
+		StringBuilder output = new StringBuilder();
+		for (String temp : read().split(",")) {
+			output.append(AES.decrypt(temp, key)+'\n');
+		}
+		return output.toString();
 	}
 
 	private void send(String txt) {
