@@ -207,7 +207,6 @@ public class Server {
 
 	private void serverStart() {
 		threads[0] = new Thread(new Runnable() {
-
 			@Override
 			public void run() {
 				while (!Thread.currentThread().isInterrupted()) {
