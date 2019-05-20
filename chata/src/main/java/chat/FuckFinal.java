@@ -38,6 +38,12 @@ public class FuckFinal {
 				message = cmd.split(" ", 2)[1];
 			}
 			client.commandSend(message);
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				throw new RuntimeException(e);
+			}
+			processCMDS("read", client);
 		} else if (cmds[0].equals("exit!")) {
 			return true;
 		} else if (cmds[0].equals("read")){
@@ -93,6 +99,11 @@ public class FuckFinal {
 		if (client ==null)
 			return; 
 		Scanner scanner = new Scanner(System.in);
+		try {
+			Thread.sleep(1000);
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 		processCMDS("read", client);
 		while (client != null) {
 			System.out.print(client.getUsername() + ">>");
