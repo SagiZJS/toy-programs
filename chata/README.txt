@@ -28,3 +28,11 @@ java -cp fuckfinal.jar chat.FuckFinal username host [port]
 
 
  
+####################################################################################################################################
+
+
+This program is a multi-users command line server-client chatting program
+
+The main tech is to use java nio to replace the complicated multithread server side code
+
+Functions specialized for usage and limited for time
